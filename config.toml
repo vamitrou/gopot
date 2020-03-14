@@ -1,0 +1,4 @@
+Ports = [ 80, 443, 8080 ]
+SMTP_Server = ""
+Mail_From = ""
+Mail_To = ""
