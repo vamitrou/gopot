@@ -10,33 +10,35 @@ import (
 	"net"
 	"net/smtp"
 	//"strconv"
-	//"strings"
+	"strings"
 	"github.com/BurntSushi/toml"
 	"time"
 )
-
-var smtp_server = "tmu-econ.mail.allianz:25"
-var mail_from = "adp-security@allianz.de"
-var mail_to = "vasileios.mitrousis@allianz.com"
 
 type Config struct {
 	Ports       []int
 	SMTP_Server string
 	Mail_From   string
 	Mail_To     string
+	Timeout     int64
 }
 
 var conf Config
+var conn_cache = make(map[string]int64)
 
-func send_mail(ip string, port string) {
-	c, err := smtp.Dial(smtp_server)
+func send_mail(ip string, port string) bool {
+        if conf.SMTP_Server == "" || conf.Mail_From == "" || conf.Mail_To == "" {
+            fmt.Printf("SMTP settings not configured.. \n")
+            return false
+        }
+	c, err := smtp.Dial(conf.SMTP_Server)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer c.Close()
 	// Set the sender and recipient.
-	c.Mail(mail_from)
-	c.Rcpt(mail_to)
+	c.Mail(conf.Mail_From)
+	c.Rcpt(conf.Mail_To)
 	// Send the email body.
 	wc, err := c.Data()
 	if err != nil {
@@ -47,15 +49,27 @@ func send_mail(ip string, port string) {
 	if _, err = buf.WriteTo(wc); err != nil {
 		log.Fatal(err)
 	}
+        return true
 }
 
 func report(ip string, port string) {
 	fmt.Printf("Connection attempt from %s at port %s\n", ip, port)
-	//send_mail(ip, port)
+	now := time.Now().Unix()
+
+	key := fmt.Sprintf("%s%s", ip, port)
+	v, found := conn_cache[key]
+	if !found || v+conf.Timeout < now {
+            sent := send_mail(ip, port)
+		if sent {
+                    fmt.Printf("Mail sent. \n")
+                }
+		conn_cache[key] = now
+	}
 }
 
 func handleConnection(c net.Conn, port string) {
-	report(c.RemoteAddr().String(), port)
+	ip := strings.Split(c.RemoteAddr().String(), ":")[0]
+	report(ip, port)
 	//for {
 	//	netData, err := bufio.NewReader(c).ReadString('\n')
 	//	if err != nil {
@@ -93,7 +107,7 @@ func serve(port string) {
 	}
 }
 
-func main() {
+func load_config(path string) {
 	b, err := ioutil.ReadFile("config.toml")
 	if err != nil {
 		log.Fatal(err)
@@ -102,7 +116,10 @@ func main() {
 	if _, err := toml.Decode(tomlData, &conf); err != nil {
 		log.Fatal(err)
 	}
+}
 
+func main() {
+        load_config("config.toml")
 	for i := 0; i < len(conf.Ports); i++ {
 		PORT := fmt.Sprintf(":%d", conf.Ports[i])
 		go serve(PORT)
