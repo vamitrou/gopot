@@ -1,5 +1,0 @@
-Ports = [ 80, 443, 8080 ]
-Timeout = 300
-SMTP_Server = ""
-Mail_From = ""
-Mail_To = ""
