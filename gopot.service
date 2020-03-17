@@ -1,0 +1,17 @@
+[Unit]
+Description=Simple Honeypot service written in GO
+ConditionPathExists=/opt/gopot
+After=network.target
+ 
+[Service]
+Type=simple
+LimitNOFILE=1024
+
+Restart=always
+RestartSec=5
+
+WorkingDirectory=/opt/gopot/
+ExecStart=/opt/gopot/gopot
+
+[Install]
+WantedBy=multi-user.target
