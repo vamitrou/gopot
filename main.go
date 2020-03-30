@@ -9,32 +9,21 @@ import (
 	"math/rand"
 	"net"
 	"net/smtp"
+	"os"
 	//"strconv"
 	"github.com/BurntSushi/toml"
+	"gopot/globals"
 	"strings"
 	"time"
 )
 
-type Config struct {
-	Ports       []int
-	SMTP_Server string
-	SMTP_User   string
-	SMTP_Passwd string
-	Mail_From   string
-	Mail_To     []string
-	Timeout     int64
-}
-
-var conf Config
-var conn_cache = make(map[string]int64)
-
 func send_mail(ip string, port string) bool {
-	if conf.SMTP_Server == "" || conf.Mail_From == "" || len(conf.Mail_To) == 0 {
+	if globals.Conf.SMTP_Server == "" || globals.Conf.Mail_From == "" || len(globals.Conf.Mail_To) == 0 {
 		fmt.Printf("SMTP settings not configured.. \n")
 		return false
 	}
 	// Connect to the remote SMTP server.
-	c, err := smtp.Dial(conf.SMTP_Server)
+	c, err := smtp.Dial(globals.Conf.SMTP_Server)
 	if err != nil {
 		fmt.Println(err)
 		return false
@@ -42,9 +31,9 @@ func send_mail(ip string, port string) bool {
 	defer c.Close()
 
 	// Authentication
-	if conf.SMTP_User != "" && conf.SMTP_Passwd != "" {
-		hostname := strings.Split(conf.SMTP_Server, ":")[0]
-		auth := smtp.PlainAuth("", conf.SMTP_User, conf.SMTP_Passwd, hostname)
+	if globals.Conf.SMTP_User != "" && globals.Conf.SMTP_Passwd != "" {
+		smtp_hostname := strings.Split(globals.Conf.SMTP_Server, ":")[0]
+		auth := smtp.PlainAuth("", globals.Conf.SMTP_User, globals.Conf.SMTP_Passwd, smtp_hostname)
 		err := smtp.Auth(auth)
 		if err != nil {
 			fmt.Println(err)
@@ -53,8 +42,8 @@ func send_mail(ip string, port string) bool {
 	}
 
 	// Set the sender and recipient.
-	c.Mail(conf.Mail_From)
-	for _, addr := range conf.Mail_To {
+	c.Mail(globals.Conf.Mail_From)
+	for _, addr := range globals.Conf.Mail_To {
 		c.Rcpt(addr)
 	}
 	// Send the email body.
@@ -65,8 +54,8 @@ func send_mail(ip string, port string) bool {
 	}
 	defer wc.Close()
 	buf := bytes.NewBufferString(fmt.Sprintf("To: %s\r\n"+
-		"Subject: Network intrusion alert\r\n\r\n"+
-		"Connection attempt from %s at port %s\n", strings.Join(conf.Mail_To, ";"), ip, port))
+		"Subject: Network intrusion alert in %s\r\n\r\n"+
+		"Connection attempt from %s at port %s\n", strings.Join(globals.Conf.Mail_To, ";"), globals.Hostname, ip, port))
 
 	if _, err = buf.WriteTo(wc); err != nil {
 		fmt.Println(err)
@@ -77,20 +66,24 @@ func send_mail(ip string, port string) bool {
 
 func report(ip string, port string) {
 	fmt.Printf("Connection attempt from %s at port %s\n", ip, port)
-	now := time.Now().Unix()
 
-	key := fmt.Sprintf("%s%s", ip, port)
-	v, found := conn_cache[key]
-	if !found || v+conf.Timeout < now {
-		sent := send_mail(ip, port)
-		if sent {
-			fmt.Printf("Mail sent. \n")
+	if len(globals.Conf.SMTP_Server) > 0 {
+		now := time.Now().Unix()
+		key := fmt.Sprintf("%s%s", ip, port)
+		v, found := globals.Conn_cache[key]
+		if !found || v+globals.Conf.Timeout < now {
+			fmt.Println("Sending email.")
+			sent := send_mail(ip, port)
+			if sent {
+				fmt.Printf("Mail sent. \n")
+				globals.Conn_cache[key] = now
+			}
 		}
-		conn_cache[key] = now
 	}
 }
 
 func handleConnection(c net.Conn, port string) {
+	fmt.Println("DEBUG: handleConnection")
 	ip := strings.Split(c.RemoteAddr().String(), ":")[0]
 	report(ip, port)
 	//for {
@@ -136,7 +129,7 @@ func load_config(path string) {
 		log.Fatal(err)
 	}
 	tomlData := string(b)
-	if _, err := toml.Decode(tomlData, &conf); err != nil {
+	if _, err := toml.Decode(tomlData, &globals.Conf); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -145,8 +138,11 @@ func main() {
 	fmt.Println("GoPot started")
 	load_config("config.toml")
 	fmt.Println("config.toml was loaded")
-	for i := 0; i < len(conf.Ports); i++ {
-		PORT := fmt.Sprintf(":%d", conf.Ports[i])
+
+	globals.Hostname, _ = os.Hostname()
+
+	for i := 0; i < len(globals.Conf.Ports); i++ {
+		PORT := fmt.Sprintf(":%d", globals.Conf.Ports[i])
 		go serve(PORT)
 	}
 
