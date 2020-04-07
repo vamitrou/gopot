@@ -17,6 +17,10 @@ import (
 	"time"
 )
 
+func potlog(msg string) {
+        fmt.Printf("[+] %s\n", msg)
+}
+
 func send_mail(ip string, port string) bool {
 	if globals.Conf.SMTP_Server == "" || globals.Conf.Mail_From == "" || len(globals.Conf.Mail_To) == 0 {
 		fmt.Printf("SMTP settings not configured.. \n")
@@ -135,15 +139,16 @@ func load_config(path string) {
 }
 
 func main() {
-	fmt.Println("GoPot started")
+	potlog("GoPot started")
 	load_config("config.toml")
-	fmt.Println("config.toml was loaded")
+	potlog("config.toml was loaded")
 
 	globals.Hostname, _ = os.Hostname()
 
 	for i := 0; i < len(globals.Conf.Ports); i++ {
 		PORT := fmt.Sprintf(":%d", globals.Conf.Ports[i])
 		go serve(PORT)
+                potlog(fmt.Sprintf("serving on port: %d", globals.Conf.Ports[i]))
 	}
 
 	for {
