@@ -1,5 +1,8 @@
 Ports = [ 80, 443, 8080 ]
 Timeout = 300
+
 SMTP_Server = "mail.example.com:25"
 Mail_From = "security@example.com"
 Mail_To = ["user1@example.com", "user2@example.com"]
+
+Exclusions = ["1.1.1.1", "1.1.1.2"]

@@ -14,4 +14,5 @@ type Config struct {
 	Mail_From   string
 	Mail_To     []string
 	Timeout     int64
+	Exclusions  []string
 }

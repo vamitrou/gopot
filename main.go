@@ -18,7 +18,7 @@ import (
 )
 
 func potlog(msg string) {
-        fmt.Printf("[+] %s\n", msg)
+	fmt.Printf("[+] %s\n", msg)
 }
 
 func send_mail(ip string, port string) bool {
@@ -87,8 +87,14 @@ func report(ip string, port string) {
 }
 
 func handleConnection(c net.Conn, port string) {
-	fmt.Println("DEBUG: handleConnection")
+	defer c.Close()
 	ip := strings.Split(c.RemoteAddr().String(), ":")[0]
+	for _, exclusion := range globals.Conf.Exclusions {
+		if ip == exclusion {
+			potlog(fmt.Sprintf("Known IP, excluding: %s", ip))
+			return
+		}
+	}
 	report(ip, port)
 	//for {
 	//	netData, err := bufio.NewReader(c).ReadString('\n')
@@ -105,7 +111,6 @@ func handleConnection(c net.Conn, port string) {
 	//	result := strconv.Itoa(rand.Intn(255)) + "\n"
 	//	c.Write([]byte(string(result)))
 	//}
-	c.Close()
 }
 
 func serve(port string) {
@@ -148,7 +153,7 @@ func main() {
 	for i := 0; i < len(globals.Conf.Ports); i++ {
 		PORT := fmt.Sprintf(":%d", globals.Conf.Ports[i])
 		go serve(PORT)
-                potlog(fmt.Sprintf("serving on port: %d", globals.Conf.Ports[i]))
+		potlog(fmt.Sprintf("serving on port: %d", globals.Conf.Ports[i]))
 	}
 
 	for {
